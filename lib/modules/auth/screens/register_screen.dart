@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/validators.dart';
+import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -33,7 +35,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the terms and conditions')),
+        SnackBar(
+          content: const Text('Please agree to the terms and conditions'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
       return;
     }
@@ -41,17 +46,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual registration with Supabase
-      await Future.delayed(const Duration(seconds: 1)); // Simulating network call
+      final authService = ref.read(authServiceProvider);
 
-      // Navigate to dashboard on success
-      if (mounted) {
-        context.go('/dashboard');
+      final response = await authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        data: {
+          'name': _nameController.text.trim(),
+        },
+      );
+
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Account created successfully! Please check your email to verify your account.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to login after successful registration
+        context.go('/auth/login');
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'An error occurred during registration';
+
+        if (e.toString().contains('User already registered')) {
+          errorMessage = 'An account with this email already exists';
+        } else if (e.toString().contains('Password should be')) {
+          errorMessage = 'Password does not meet security requirements';
+        } else if (e.toString().contains('Supabase client not initialized')) {
+          errorMessage = 'Authentication service not available. Please check your configuration.';
+        } else if (e.toString().contains('Network')) {
+          errorMessage = 'Network error. Please check your connection.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration failed: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -99,12 +133,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           labelText: 'Full Name',
                           prefixIcon: Icon(Icons.person),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your name';
-                          }
-                          return null;
-                        },
+                        validator: Validators.validateName,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -114,15 +143,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           labelText: 'Email',
                           prefixIcon: Icon(Icons.email),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Please enter a valid email';
-                          }
-                          return null;
-                        },
+                        validator: Validators.validateEmail,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -144,15 +165,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             },
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a password';
-                          }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
-                          return null;
-                        },
+                        validator: Validators.validatePassword,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -174,15 +187,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             },
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please confirm your password';
-                          }
-                          if (value != _passwordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
+                        validator: (value) =>
+                          Validators.validateConfirmPassword(value, _passwordController.text),
                       ),
                       const SizedBox(height: 16),
                       CheckboxListTile(

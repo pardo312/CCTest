@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'marketplace_config.dart';
 
 class AppConfig {
@@ -5,12 +6,13 @@ class AppConfig {
   static const String appDescription = 'Your All-in-One Marketplace';
   static const String version = '1.0.0';
 
-  // TODO: Replace with actual Supabase credentials
-  static const String supabaseUrl = 'YOUR_SUPABASE_URL';
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
-
-  // TODO: Replace with actual Stripe credentials
-  static const String stripePublicKey = 'YOUR_STRIPE_PUBLIC_KEY';
+  // Environment variables loaded from .env file
+  static String get supabaseUrl =>
+    dotenv.env['SUPABASE_URL'] ?? '';
+  static String get supabaseAnonKey =>
+    dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  static String get stripePublicKey =>
+    dotenv.env['STRIPE_PUBLIC_KEY'] ?? '';
 
   static const MarketplaceType primaryMarketplace = MarketplaceType.course;
   static const List<MarketplaceType> enabledMarketplaces = [

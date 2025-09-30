@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/validators.dart';
+import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -29,17 +31,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual login with Supabase
-      await Future.delayed(const Duration(seconds: 1)); // Simulating network call
+      final authService = ref.read(authServiceProvider);
 
-      // Navigate to dashboard on success
-      if (mounted) {
-        context.go('/dashboard');
+      final response = await authService.signIn(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (response != null && mounted) {
+        // Check for redirect parameter
+        final uri = GoRouterState.of(context).uri;
+        final redirect = uri.queryParameters['redirect'];
+
+        if (redirect != null && redirect.isNotEmpty) {
+          context.go(redirect);
+        } else {
+          context.go('/dashboard');
+        }
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'An error occurred during login';
+
+        if (e.toString().contains('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (e.toString().contains('Email not confirmed')) {
+          errorMessage = 'Please verify your email before logging in';
+        } else if (e.toString().contains('Supabase client not initialized')) {
+          errorMessage = 'Authentication service not available. Please check your configuration.';
+        } else if (e.toString().contains('Network')) {
+          errorMessage = 'Network error. Please check your connection.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -87,15 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           labelText: 'Email',
                           prefixIcon: Icon(Icons.email),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Please enter a valid email';
-                          }
-                          return null;
-                        },
+                        validator: Validators.validateEmail,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -121,9 +141,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your password';
                           }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
+                          // For login, we don't enforce strict password rules,
+                          // just check if it's not empty
                           return null;
                         },
                       ),
